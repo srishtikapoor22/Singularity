@@ -1,0 +1,10 @@
+torch
+torchvision
+streamlit
+plotly
+scikit-learn
+umap-learn
+numpy
+pandas
+pytest
+streamlit-drawable-canvas
