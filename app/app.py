@@ -94,20 +94,25 @@ def plot_decision_boundary(model, x):
 
 
 with tab1:
+    st.header("XOR Neural Network Playground")
+
+    # --- Model Setup ---
     model = MLP(input_dim=2, hidden_dims=[8], output_dim=1)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-    
+
+    # --- XOR Data ---
     x = torch.tensor([[0., 0.], [0., 1.], [1., 0.], [1., 1.]], dtype=torch.float32)
     y = torch.tensor([[0.], [1.], [1.], [0.]], dtype=torch.float32)
-    
+
+    # --- Sidebar: Training Settings ---
     st.sidebar.header("Training Settings")
     epochs = st.sidebar.slider("Epochs", 100, 2000, 500, step=100)
-    train_btn = st.sidebar.button("Train Model")
-    
+    train_btn = st.sidebar.button("Train XOR Model")
+
     if train_btn:
         losses = []
-        for epoch in range(epochs): 
+        for epoch in range(epochs):
             optimizer.zero_grad()
             outputs = model(x)
             loss = criterion(outputs, y)
@@ -115,42 +120,42 @@ with tab1:
             optimizer.step()
             losses.append(loss.item())
 
-        st.success(f"Training Complete! final loss: {loss.item():.4f}")
+        st.success(f"✅ Training Complete! Final Loss: {loss.item():.4f}")
 
+        # Plot decision boundary
         fig, ax = plot_decision_boundary(model, x)
-        ax.scatter(x[:, 0], x[:, 1], edgecolors="k", cmap=plt.cm.coolwarm, s=100)
+        ax.scatter(
+            x[:, 0], x[:, 1],
+            c=y.squeeze(),
+            cmap=plt.cm.coolwarm,
+            s=100,
+            edgecolors="k"
+        )
         st.pyplot(fig)
 
-
+    # --- Sidebar: Test Inputs ---
     st.sidebar.header("Test Inputs")
     a = st.sidebar.selectbox("Input A", [0.0, 1.0])
     b = st.sidebar.selectbox("Input B", [0.0, 1.0])
-    if st.sidebar.button("Run Xor"):
+
+    if st.sidebar.button("Run XOR Prediction"):
         with torch.no_grad():
-            pred = model(torch.tensor([[float(a), float(b)]]))
+            test_input = torch.tensor([[float(a), float(b)]])
+            pred = model(test_input)
             pred_prob = torch.sigmoid(pred)
-        st.write(f"**Prediction for ({a}, {b}):** {pred.item():.4f}")
+        st.write(f"**Prediction for ({a}, {b}):** {pred_prob.item():.4f}")
 
 
-    st.header("Forward Pass Animation")
-    if st.button("Generate Forward Animation"):
-        recorder = ActivationRecorder()
-        out_file = animate_fwd(
-            model, recorder, x, [2, 8, 1], 2,
-            out="assets/xor_fwd.mp4"
-            )
-        st.success("Animation generated!")
-        st.video(out_file)
+
+    if st.button("Generate 3D XOR Visualization"):
+        from viz.xor_3d import xor_3d_viz
+
+        # Prepare the same user-selected input for visualization
+        input_tensor = torch.tensor([[float(a), float(b)]])
         
-
-        st.header("Interactive 3D Network")
-
-        if st.button("Show Interactive 3D Network"):
-            X_sample = torch.tensor([[0., 1.]])
-            activations = forward_pass_activations(model, X_sample, [2, 8, 1])
-
-            fig = build_network_figure([2, 8, 1], activations)
-            st.plotly_chart(fig, use_container_width=True)
+        # Generate the 3D visualization using the trained model
+        fig3d = xor_3d_viz(model, input_tensor)
+        st.plotly_chart(fig3d, use_container_width=True)
 
 
 
