@@ -48,15 +48,18 @@ def train_xor(save_path: str = "models/xor.pth", epochs: int = 1000, lr: float =
             hidden_layer = list(activations.keys())[0]
             hidden_acts = activations[hidden_layer].detach().numpy()
 
-            fig, ax = plt.subplots(figsize=(6, 4))
-            im = ax.imshow(hidden_acts, cmap="plasma", aspect="auto")
+            fig, ax = plt.subplots()
+            im = ax.imshow(hidden_acts, cmap="viridis", aspect="auto")
             ax.set_title("Hidden Layer Activations XOR")
             ax.set_xlabel("Neurons")
             ax.set_ylabel("Samples")
             ax.set_yticks(range(4))
             ax.set_yticklabels(["00","01","10","11"])
             fig.colorbar(im, ax=ax)
-            plt.show()
+            
+            os.makedirs("assets",exist_ok=True)
+            plt.savefig("assets/hidden_layer_heatmap.png",dpi=200)
+            plt.close()
 
     # Save model
     os.makedirs(os.path.dirname(save_path), exist_ok=True)

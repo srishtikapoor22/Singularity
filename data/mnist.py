@@ -5,20 +5,20 @@ from torch.utils.data import DataLoader
 
 def get_mnist_loaders(batch_size: int=64):
     transform=transforms.Compose([
-        transforms.ToTesnor(),
+        transforms.ToTensor(),
         transforms.Normalize((0.1307,),(0.3081,))
 
     ])
     train_dataset=datasets.MNIST(
         root="./data",
         train=True,
-        downloads=True,
+        download=True,
         transform=transform
     )
     test_dataset=datasets.MNIST(
         root="./data",
         train=False,
-        downloads=True,
+        download=True,
         transform=transform
     )
     train_loader=DataLoader(train_dataset,batch_size=batch_size,shuffle=True)

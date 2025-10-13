@@ -3,45 +3,54 @@ import torch
 
 class ActivationRecorder:
     """
-    Records intermediate activations of specified layers in a PyTorch model.
+    Records intermediate activations from specific layers during the forward pass.
     """
 
     def __init__(self):
         self.data: Dict[str, torch.Tensor] = {}
         self.handles: List[torch.utils.hooks.RemovableHandle] = []
+        self.layer_order: List[str] = []
 
-    def register(self, model: torch.nn.Module, layer_names: List[str]):
+    def register(self, model, layer_names: List[str] = None):
         """
-        Attach forward hooks to layers in the model whose names match `layer_names`.
+        Register forward hooks to capture activations from specific layers.
+        If `layer_names` is None, automatically attach to all Linear/Conv2d layers.
         """
-        # Clear old hooks if any
         self.remove()
 
         for name, module in model.named_modules():
-            if name in layer_names:
+            if layer_names is None:
+                # Automatically register for Linear or Conv2d layers
+                if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d)):
+                    handle = module.register_forward_hook(self._make_hook(name))
+                    self.handles.append(handle)
+                    self.layer_order.append(name)
+            elif name in layer_names:
                 handle = module.register_forward_hook(self._make_hook(name))
                 self.handles.append(handle)
+                self.layer_order.append(name)
 
     def _make_hook(self, name: str) -> Callable:
-        """
-        Internal helper to generate hook function for a given layer name.
-        """
+        """Internal helper to create the forward hook."""
         def hook(module, input, output):
             try:
                 self.data[name] = output.detach().cpu()
             except Exception:
-                # fallback in case output is not a tensor
                 self.data[name] = output
         return hook
 
     def remove(self):
-        """
-        Remove all hooks and clear recorded activations.
-        """
-        self.data.clear()
+        """Remove all hooks and clear stored activations."""
         for h in self.handles:
             try:
                 h.remove()
             except Exception:
                 pass
         self.handles = []
+        self.data.clear()
+        self.layer_order = []
+
+    def get_activations(self) -> Dict[str, torch.Tensor]:
+        """Return recorded activations in layer order."""
+        ordered_data = {k: self.data[k] for k in self.layer_order if k in self.data}
+        return ordered_data
