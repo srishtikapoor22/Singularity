@@ -102,7 +102,7 @@ def mnist_3d_viz(images=None, labels=None, model=None, sample_idx=0, max_neurons
     for li, n in enumerate(layer_sizes):
         x = li * x_spacing
         ys = np.linspace(-(n - 1) / 2.0 * y_spacing, (n - 1) / 2.0 * y_spacing, n)
-        zs = np.zeros(n) + (li % 2) * 0.8  # subtle depth offset
+        zs = np.zeros(n)
         coords.append([(x, float(y), float(z)) for y, z in zip(ys, zs)])
 
     # --- Normalizer
@@ -149,12 +149,14 @@ def mnist_3d_viz(images=None, labels=None, model=None, sample_idx=0, max_neurons
         zs = [p[2] for p in layer_coord]
 
         if li == len(coords) - 1:
-            # Output layer: highlight only predicted neuron
-            colors = ["white" if i == pred_label else "gray" for i in range(len(ys))]
-            sizes = [22 if i == pred_label else 10 for i in range(len(ys))]
+            colors = ["#66FCF1" if i == pred_label else "rgba(100,100,150,0.3)" for i in range(len(ys))]
+            sizes = [18 if i == pred_label else 8 for i in range(len(ys))]
+
         else:
-            colors = [f"rgba(255,150,50,{0.3 + 0.7*a})" for a in norm_acts]
-            sizes = 6 + 20 * norm_acts
+            # deep-space colors: low = dark violet, high = electric blue
+            colors = [f"rgba({50 + int(180*a)}, {100 + int(80*a)}, 255, {0.4 + 0.6*a})" for a in norm_acts]
+            sizes = 6 + 10 * norm_acts  # subtler scaling, not oversized
+
 
         fig.add_trace(go.Scatter3d(
             x=xs, y=ys, z=zs,
@@ -167,35 +169,70 @@ def mnist_3d_viz(images=None, labels=None, model=None, sample_idx=0, max_neurons
         ))
 
     # --- Add clear labels
+    # --- Add clear layer labels (except Input Layer)
+    # --- Add clear layer titles (Input Layer included)
     titles = ["Input Layer", "Hidden Layer 1", "Hidden Layer 2", "Output Layer"]
+
     for i, title in enumerate(titles[:len(coords)]):
         lx = coords[i][0][0]
+        # position label slightly above the topmost neuron for clarity
+        max_y = max(p[1] for p in coords[i])
         fig.add_trace(go.Scatter3d(
             x=[lx],
-            y=[max([p[1] for p in coords[i]]) + 5],
+            y=[max_y + 8],  # increased spacing
             z=[0],
             mode="text",
             text=[title],
-            textfont=dict(color="white", size=16),
+            textfont=dict(color="rgba(200,200,255,0.95)", size=18, family="Orbitron, monospace"),
             showlegend=False
         ))
 
+
+    # Input labels (show pixel input count or just "Input Values")
+    if len(coords) > 0:
+        x_in = coords[0][0][0]
+        fig.add_trace(go.Scatter3d(
+            x=[x_in] * len(acts_by_layer[0]),
+            y=[p[1] for p in coords[0]],
+            z=[0] * len(acts_by_layer[0]),
+            mode="text",
+            text=None,
+            textfont=dict(color="#00FFFF", size=10),
+            showlegend=False
+        ))
+
+    # Output neuron labels (digits 0–9)
+    if len(coords) > 0:
+        x_out = coords[-1][0][0]
+        fig.add_trace(go.Scatter3d(
+            x=[x_out] * 10,
+            y=[p[1] for p in coords[-1][:10]],
+            z=[0] * 10,
+            mode="text",
+            text=[str(i) for i in range(10)],
+            textfont=dict(color="#66FCF1", size=14),
+            showlegend=False
+        ))
+
+
     # --- Layout
     fig.update_layout(
-        title=dict(
-            text=f"MNIST Forward Pass → Predicted: {pred_label} (Conf {confidence:.1f}%)<br>"
-                 f"<span style='font-size:14px;'>True Label: {y_true}</span>",
-            font=dict(color="white", size=20)
-        ),
-        scene=dict(
-            xaxis=dict(visible=False),
-            yaxis=dict(visible=False),
-            zaxis=dict(visible=False),
-            bgcolor="black",
-        ),
-        paper_bgcolor="black",
-        margin=dict(l=0, r=0, t=80, b=0)
-    )
+    title=dict(
+        text=f"<b>MNIST Forward Pass → Predicted: {pred_label} (Conf {confidence:.1f}%)</b><br>"
+             f"<span style='font-size:14px; color:#bbb;'>True Label: {y_true}</span>",
+        font=dict(color="#C7D7FF", size=22, family="Orbitron, monospace"),
+        x=0.5,
+    ),
+    scene=dict(
+        xaxis=dict(visible=False, showgrid=False),
+        yaxis=dict(visible=False, showgrid=False),
+        zaxis=dict(visible=False, showgrid=False),
+        bgcolor="#020611"
+    ),
+    paper_bgcolor="#000000",
+    margin=dict(l=0, r=0, t=90, b=0)
+)
+
 
     fig.show()
     return fig

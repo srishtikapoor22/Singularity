@@ -6,6 +6,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 from models.mlp import MLP
+from models.xor_model import XORModel
 from viz.animate_fwd import animate_fwd
 from utils.activations import ActivationRecorder
 import sys, os
@@ -75,31 +76,24 @@ st.set_page_config(page_title="Singularity", layout="wide")
 st.title("Singularity")
 tab1,tab2=st.tabs(["XOR Demo","MNIST Demo"])
 
-def plot_decision_boundary(model, x):
-    h = 0.02
-    x_min, x_max = -0.5, 1.5
-    y_min, y_max = -0.5, 1.5
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
-                         np.arange(y_min, y_max, h))
-    grid = torch.tensor(np.c_[xx.ravel(), yy.ravel()], dtype=torch.float32)
-    with torch.no_grad():
-        preds = model(grid).numpy().reshape(xx.shape)
-    fig, ax = plt.subplots()
-    ax.contourf(xx, yy, preds, cmap=plt.cm.coolwarm, alpha=0.8)
-    ax.set_xlim(xx.min(), xx.max())
-    ax.set_ylim(yy.min(), yy.max())
-    ax.set_xticks([])
-    ax.set_yticks([])
-    return fig, ax
+
 
 
 with tab1:
     st.header("XOR Neural Network Playground")
 
     # --- Model Setup ---
-    model = MLP(input_dim=2, hidden_dims=[8], output_dim=1)
-    criterion = nn.BCEWithLogitsLoss()
+    # --- Model Setup (XORModel with session persistence) ---
+    if "xor_model" not in st.session_state:
+        st.session_state["xor_model"] = XORModel()          # model instance persisted across reruns
+        st.session_state["xor_trained"] = False
+
+    model = st.session_state["xor_model"]
+
+    # Use BCELoss because XORModel ends with Sigmoid
+    criterion = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+
 
     # --- XOR Data ---
     x = torch.tensor([[0., 0.], [0., 1.], [1., 0.], [1., 1.]], dtype=torch.float32)
@@ -121,17 +115,14 @@ with tab1:
             losses.append(loss.item())
 
         st.success(f"✅ Training Complete! Final Loss: {loss.item():.4f}")
+            # persist weights so future reruns / viz use the trained model
+        os.makedirs("models", exist_ok=True)
+        save_path = "models/xor_streamlit.pth"
+        torch.save(model.state_dict(), save_path)
+        st.session_state["xor_trained"] = True
+        st.info(f"Model weights saved to {save_path}")
 
-        # Plot decision boundary
-        fig, ax = plot_decision_boundary(model, x)
-        ax.scatter(
-            x[:, 0], x[:, 1],
-            c=y.squeeze(),
-            cmap=plt.cm.coolwarm,
-            s=100,
-            edgecolors="k"
-        )
-        st.pyplot(fig)
+        
 
     # --- Sidebar: Test Inputs ---
     st.sidebar.header("Test Inputs")
@@ -139,23 +130,40 @@ with tab1:
     b = st.sidebar.selectbox("Input B", [0.0, 1.0])
 
     if st.sidebar.button("Run XOR Prediction"):
+    # If saved weights exist, load them into the session model (ensures we use trained weights)
+        save_path = "models/xor_streamlit.pth"
+        if os.path.exists(save_path):
+            model.load_state_dict(torch.load(save_path, map_location="cpu"))
+            model.eval()
+            st.success("Loaded trained weights for prediction.")
+        else:
+            st.warning("No saved model weights found — predictions will use current model (may be untrained).")
+
         with torch.no_grad():
             test_input = torch.tensor([[float(a), float(b)]])
-            pred = model(test_input)
-            pred_prob = torch.sigmoid(pred)
-        st.write(f"**Prediction for ({a}, {b}):** {pred_prob.item():.4f}")
+            pred = model(test_input)  # XORModel already applies Sigmoid in forward
+            # ensure scalar prob
+            prob = float(pred.item()) if pred.numel() == 1 else float(pred.detach().cpu().numpy().flatten()[0])
+        st.write(f"**Prediction for ({a}, {b}):** {prob:.4f}  → class: {1 if prob > 0.5 else 0}")
+
 
 
 
     if st.button("Generate 3D XOR Visualization"):
         from viz.xor_3d import xor_3d_viz
+        # load trained weights if available
+        save_path = "models/xor_streamlit.pth"
+        if os.path.exists(save_path):
+            model.load_state_dict(torch.load(save_path, map_location="cpu"))
+            model.eval()
+            st.success("Loaded trained model for visualization.")
+        else:
+            st.warning("No saved model found — visualizing current model (may be untrained).")
 
-        # Prepare the same user-selected input for visualization
         input_tensor = torch.tensor([[float(a), float(b)]])
-        
-        # Generate the 3D visualization using the trained model
         fig3d = xor_3d_viz(model, input_tensor)
         st.plotly_chart(fig3d, use_container_width=True)
+
 
 
 
