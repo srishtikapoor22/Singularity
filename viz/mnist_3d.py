@@ -61,6 +61,13 @@ def mnist_3d_viz(images=None, labels=None, model=None, sample_idx=0, max_neurons
     import plotly.graph_objects as go
     from utils.activations import ActivationRecorder
 
+    if isinstance(labels, (int, float)):
+        y_true = int(labels)
+        sample_idx = 0
+    else:
+        sample_idx = 0
+        y_true = labels[sample_idx].item()
+
     # --- Sanity checks
     if images is None or model is None:
         print("Error: Please provide model and images for visualization.")

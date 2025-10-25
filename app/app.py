@@ -16,6 +16,10 @@ from data.mnist import get_mnist_loaders
 from viz.mnist_viz import viz_mnistfwd
 from torch.utils.data import DataLoader
 from torchvision import datasets,transforms
+from utils.predict_mnist import load_model, predict_image,_preprocess_pil
+from PIL import Image
+import io
+from viz.mnist_3d import mnist_3d_viz
 
 PROJECT_ROOT = r"C:\Users\Srishti\Singularity"
 if PROJECT_ROOT not in sys.path:
@@ -220,6 +224,73 @@ with tab2:
         
         st.pyplot(fig)
 
+    # --- MNIST Upload & Predict UI ---
+    st.subheader("Upload & Predict a Digit")
+
+    # Load prediction model (cached so it doesn't reload on every rerun)
+    @st.cache_resource(show_spinner=False)
+    def get_predict_model(path="models/mnist.pt"):
+        try:
+            # try to load saved weights
+            return load_model(model_path=path, device="cpu")
+        except Exception as e:
+            # If file missing or load fails, return None (we'll fallback)
+            return None
+
+    predict_model = get_predict_model("models/mnist.pt")
+
+    uploaded = st.file_uploader("Upload an image (png/jpg) of a digit to predict", type=["png","jpg","jpeg","bmp","gif"])
+
+    if uploaded is not None:
+        try:
+            pil_img = Image.open(uploaded).convert("RGB")
+        except Exception as e:
+            st.error(f"Unable to open image: {e}")
+            pil_img = None
+
+        if pil_img is not None:
+            st.image(pil_img, caption="Uploaded image", width=150)
+
+            # Button to run prediction
+            if st.button("Predict uploaded image"):
+                # prefer saved model if available
+                if predict_model is None:
+                    # fallback to in-memory un/saved model defined above (mnist_model)
+                    try:
+                        # ensure the model is on cpu and eval mode
+                        mnist_model.eval()
+                        local_model = mnist_model
+                        st.info("Using in-session MNIST model (saved model not found).")
+                    except Exception as e:
+                        st.error("No model available for prediction. Train the model or save 'models/mnist.pt'.")
+                        local_model = None
+                else:
+                    local_model = predict_model
+                    st.success("Loaded saved model for prediction.")
+
+                if local_model is not None:
+                    try:
+                        img_bytes=uploaded.getvalue()
+                        pred_label,probs=predict_image(local_model,image_bytes=img_bytes,device="cpu")
+                        st.subheader(f"Predicted digit: {pred_label}")
+
+                        #top 3 predictions
+                        sorted_idx=sorted(range(len(probs)),key=lambda i:probs[i],reverse=True)
+                        st.write("Top predictions:")
+                        for i in sorted_idx[:3]:
+                            st.write(f"{i}:{probs[i]*100:.2f}%")
+                        st.bar_chart({str(i):probs[i] for i in range(len(probs))})
+
+                        pil_img=Image.open(io.BytesIO(img_bytes)).convert("L")
+                        preproc_tensor=_preprocess_pil(pil_img)
+
+                        st.session_state['test_image_tensor']=preproc_tensor
+                        st.session_state['test_label_pred']=int(pred_label)
+
+                        st.success("Prediction saved for 3D visualisation")
+                    except Exception as e:
+                        st.error(f"Prediction failed: {e}")
+
         #testing and viz
     st.subheader("MNIST Model Testing and Visualization")
 
@@ -257,22 +328,31 @@ with tab2:
         st.session_state['test_labels'] = labels
 
     if st.button("Generate 3D Visualization"):
-        # Check if we have test data in session state
-        if 'test_images' not in st.session_state:
-            st.warning("Please run 'Test MNIST Model' first to load test data!")
-        else:
-            # Load model
-            mnist_model.load_state_dict(torch.load("models/mnist.pt"))
-            mnist_model.eval()
-            
-            # Get stored test data
-            images = st.session_state['test_images']
-            labels = st.session_state['test_labels']
-            
-            # Generate 3D visualization
-            from viz.mnist_3d import mnist_3d_viz
-            fig3d = mnist_3d_viz(images, labels, mnist_model)
+        #loading trained model
+        mnist_model.load_state_dict(torch.load("models/mnist.pt",map_location="cpu"))
+        mnist_model.eval()
+
+        #case1: custom image
+        if 'test_image_tensor' in st.session_state:
+            pil_img=st.session_state['test_image_tensor']
+            label=st.session_state.get('test_pred_label',None)
+
+            st.info("Generating 3D Vizualisation")
+            x=pil_img.view(1,-1).float()
+            fig3d = mnist_3d_viz(x, torch.tensor([st.session_state['test_label_pred']]), mnist_model)
+            st.plotly_chart(fig3d,use_container_width=True)
+
+        #case2: fallback to sample input
+        elif 'test_images' in st.session_state:
+            images=st.session_state['test_images']
+            labels=st.session_state['test_labels']
+            x=images[0].view(1,-1)
+            label=labels[0].item()
+
+            st.info(f"Generating 3D Visualization for test sample (True Label: {label})...")
+            fig3d = mnist_3d_viz(x, torch.tensor([label]), mnist_model)
             st.plotly_chart(fig3d, use_container_width=True)
-
-
-
+        
+        #case3: no input
+        else:
+            st.warning("Please upload an image or run 'Test MNIST Model' first!")
