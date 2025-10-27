@@ -175,7 +175,7 @@ with tab2:
     st.header("MNIST Digit Classifier")
      
      #data setup
-    transform=transforms.Compose([transforms.ToTensor()])
+    transform=transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,),(0.3081,))])
     train_dataset=datasets.MNIST(root='data',train=True,download=True,transform=transform)
     test_dataset=datasets.MNIST(root='data',train=False,download=True,transform=transform)
 
@@ -186,11 +186,11 @@ with tab2:
      #model setup
     mnist_model=MLP(28*28,[128,64],10)
     criterion=nn.CrossEntropyLoss()
-    optimizer=optim.Adam(mnist_model.parameters(),lr=0.001)
+    optimizer=optim.Adam(mnist_model.parameters(),lr=0.001,weight_decay=1e-4)
 
      #sidebar
     st.sidebar.header("MNIST Training Settings")
-    mnist_epochs=st.sidebar.slider("Epochs",1,5,1)
+    mnist_epochs=st.sidebar.slider("Epochs",1,15,5)
     mnist_btn=st.sidebar.button("Train MNIST Model")
      
      #training
@@ -228,7 +228,7 @@ with tab2:
     st.subheader("Upload & Predict a Digit")
 
     # Load prediction model (cached so it doesn't reload on every rerun)
-    @st.cache_resource(show_spinner=False)
+    #@st.cache_resource(show_spinner=False)
     def get_predict_model(path="models/mnist.pt"):
         try:
             # try to load saved weights
@@ -253,6 +253,8 @@ with tab2:
 
             # Button to run prediction
             if st.button("Predict uploaded image"):
+                
+
                 # prefer saved model if available
                 if predict_model is None:
                     # fallback to in-memory un/saved model defined above (mnist_model)
@@ -272,6 +274,8 @@ with tab2:
                     try:
                         img_bytes=uploaded.getvalue()
                         pred_label,probs=predict_image(local_model,image_bytes=img_bytes,device="cpu")
+                        st.write("predict_image top-3:", sorted(range(len(probs)), key=lambda i:probs[i], reverse=True)[:3])
+                        st.write("predict_image argmax:", int(np.argmax(probs)))
                         st.subheader(f"Predicted digit: {pred_label}")
 
                         #top 3 predictions
@@ -284,10 +288,64 @@ with tab2:
                         pil_img=Image.open(io.BytesIO(img_bytes)).convert("L")
                         preproc_tensor=_preprocess_pil(pil_img)
 
-                        st.session_state['test_image_tensor']=preproc_tensor
-                        st.session_state['test_label_pred']=int(pred_label)
+                        #DEBUG
+                        prepped = preproc_tensor.clone().view(1, 28, 28)  # normalized tensor
+                        inv = prepped * 0.3081 + 0.1307
+                        inv_img = (inv.squeeze().cpu().numpy() * 255.0).clip(0,255).astype('uint8')
+                        st.image(inv_img, caption="Preprocessed image shown to model (reconstructed)", width=150)
+
+                        st.write("Preprocessed tensor stats:", {
+                            "shape": preproc_tensor.shape,
+                            "min": float(preproc_tensor.min()),
+                            "max": float(preproc_tensor.max()),
+                            "mean": float(preproc_tensor.mean()),
+                            "std": float(preproc_tensor.std())
+                        })
+
+                        # make prediction using the same local_model we selected earlier
+                        # ensure tensor is float and on cpu and flattened (MLP expects [1, 784])
+                        input_tensor = preproc_tensor.to("cpu").float().view(1, -1)
+
+                        with torch.no_grad():
+                            try:
+                                st.write("DEBUG before model call")  # should print
+                                st.write("DEBUG local_model type:", type(local_model))
+                                output = local_model(input_tensor)
+                                st.write("DEBUG after model call")
+                            except Exception as e:
+                                st.error(f"Prediction failed: {e}")
+                            probs_from_forward = torch.softmax(output, dim=1).cpu().numpy()[0]
+                            pred_from_forward = int(np.argmax(probs_from_forward))
+
+                        # display predicted value (from direct forward)
+                        st.write(f"Predicted Digit (direct forward): {pred_from_forward}")
+
+                        # --- DEBUG: compare predict_image helper vs direct model forward ---
+                        debug_tensor = preproc_tensor.to("cpu").float()  # shape (1,784)
+
+                        with torch.no_grad():
+                            logits_direct = local_model(debug_tensor)           # raw logits
+                            probs_direct = torch.softmax(logits_direct, dim=1).cpu().numpy()[0]  # size 10
+                            argmax_direct = int(np.argmax(probs_direct))
+
+                        # If you already used predict_image() earlier:
+                        st.write("DEBUG compare:")
+                        st.write(" predict_image() returned: ", pred_label, probs[:5])
+                        st.write(" direct forward argmax:", argmax_direct, " top probs:", probs_direct[:5])
+                        st.write(" raw logits (direct):", logits_direct.detach().cpu().numpy().round(4))
+
+                        # debug numeric summary
+                        arr = preproc_tensor.detach().cpu().numpy().reshape(-1)
+                        st.write("preprocess shape:", arr.shape)
+                        st.write("min,max,mean,std:", float(arr.min()), float(arr.max()), float(arr.mean()), float(arr.std()))
+                        st.write("first10:", arr[:10].tolist())
+
+                        # save for viz
+                        st.session_state['test_image_tensor'] = preproc_tensor
+                        st.session_state['test_label_pred'] = int(pred_label)
 
                         st.success("Prediction saved for 3D visualisation")
+
                     except Exception as e:
                         st.error(f"Prediction failed: {e}")
 
@@ -334,8 +392,8 @@ with tab2:
 
         #case1: custom image
         if 'test_image_tensor' in st.session_state:
-            pil_img=st.session_state['test_image_tensor']
-            label=st.session_state.get('test_pred_label',None)
+            pil_img=st.session_state['test_image_tensor'].view(1,-1).float()
+            label=st.session_state.get('test_label_pred',None)
 
             st.info("Generating 3D Vizualisation")
             x=pil_img.view(1,-1).float()

@@ -5,6 +5,9 @@ import torch.nn.functional as F
 import numpy as np
 from models.mlp import MLP
 import io
+from torchvision import transforms
+import numpy as np
+from PIL import Image,ImageOps,ImageFilter 
 
 MODEL_PATH = "models/mnist.pt"   # adjust if different
 
@@ -17,32 +20,38 @@ def load_model(model_path: str = MODEL_PATH, device="cpu"):
     return model
 
 def _preprocess_pil(img: Image.Image):
-    """
-    Expects a PIL image. Returns a torch tensor shaped (1, 28*28), dtype float32,
-    normalized with MNIST mean/std.
-    """
-    # ensure grayscale
-    img = img.convert("L")
+    #convert to grayscale
+    img=img.convert("L")
 
-    # resize to 28x28 with antialias
-    img = img.resize((28, 28), Image.LANCZOS)
+    #invert if bg is white
+    arr=np.array(img)/255.0
+    if arr.mean()>0.3:
+        img=ImageOps.invert(img)
 
-    # convert to numpy [0..1]
-    arr = np.asarray(img).astype(np.float32) / 255.0  # shape (28,28)
+    img=img.filter(ImageFilter.GaussianBlur(radius=0.5))
 
-    # heuristic: if background is white and digit is dark (common photo), invert so digit is white on black
-    # MNIST digits are white (high pixel value) on black (low). If mean is > 0.5, we assume white background and invert.
-    if arr.mean() > 0.5:
-        arr = 1.0 - arr
+    bw=np.array(img)
+    coords=np.column_stack(np.where(bw>10))
+    if coords.size>0:
+        y0,x0=coords.min(axis=0)
+        y1,x1=coords.max(axis=0)
+        img=img.crop((x0,y0,x1+1,y1+1))
+        img=img.resize((20,20),Image.Resampling.LANCZOS)
+        new_img=Image.new("L",(28,28),0)
+        new_img.paste(img,((28-20)//2,(28-20)//2))
+        img=new_img
+    else:
+        img=img.resize((28,28),Image.Resampling.LANCZOS)
 
-    # normalize with MNIST stats
-    mean = 0.1307
-    std = 0.3081
-    arr = (arr - mean) / std
+    #convert to tensor and normalize
+    transform=transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,),(0.3081,))
+    ])
+    
+    return transform(img).view(1,-1)
 
-    # flatten and convert to tensor
-    tensor = torch.from_numpy(arr).view(1, -1).float()
-    return tensor
+
 
 def predict_image(model, pil_image=None, image_bytes: bytes = None, device="cpu"):
     """
@@ -56,7 +65,7 @@ def predict_image(model, pil_image=None, image_bytes: bytes = None, device="cpu"
         raise ValueError("Provide a PIL image or image_bytes")
 
     x = _preprocess_pil(pil_image)
-    x = x.to(device)
+    x = x.to(device).float()
 
     with torch.no_grad():
         logits = model(x)
