@@ -65,7 +65,7 @@ Singularity/
 
 ## Live Demo
 
-Try out the **Singularity** app live on Streamlit:
-https://srishtikapoor22-singularity-app-qa2yle.streamlit.app/
+Try out the **Singularity** app live on Streamlit: <https://srishtikapoor22-singularity-app-qa2yle.streamlit.app/>
+
 
 
