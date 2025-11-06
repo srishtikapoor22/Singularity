@@ -9,20 +9,20 @@ from utils.activations import ActivationRecorder
 def train_xor(save_path: str = "models/xor.pth", epochs: int = 1000, lr: float = 0.01):
     torch.manual_seed(42)
 
-    # XOR data
+    
     X = torch.tensor([[0., 0.], [0., 1.], [1., 0.], [1., 1.]], dtype=torch.float32)
     y = torch.tensor([[0.], [1.], [1.], [0.]], dtype=torch.float32)
 
-    # Model + recorder
+    
     model = MLP(input_dim=2, hidden_dims=[8], output_dim=1)
     recorder = ActivationRecorder()
-    recorder.register(model.net, ["0", "2"])  # hook into Linear layers
+    recorder.register(model.net, ["0", "2"])
 
-    # Loss + optimizer
+    
     loss_fn = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # Training loop
+
     for epoch in range(1, epochs + 1):
         model.train()
         preds = model(X)
@@ -41,9 +41,9 @@ def train_xor(save_path: str = "models/xor.pth", epochs: int = 1000, lr: float =
                 print("Preds (logits):", out.numpy().round(3))
                 print("Preds (probs):", probs.numpy().round(3))
 
-            # Access recorded activations
-            _ = model(X)  # forward pass to record
-            activations = recorder.data  # <-- corrected
+            
+            _ = model(X)
+            activations = recorder.data
 
             hidden_layer = list(activations.keys())[0]
             hidden_acts = activations[hidden_layer].detach().numpy()
@@ -61,7 +61,7 @@ def train_xor(save_path: str = "models/xor.pth", epochs: int = 1000, lr: float =
             plt.savefig("assets/hidden_layer_heatmap.png",dpi=200)
             plt.close()
 
-    # Save model
+    
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     torch.save(model.state_dict(), save_path)
     print(f"Model saved to {save_path}")

@@ -26,7 +26,6 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
   
 
-#css
 st.markdown("""
     <style>
     /* Main background */
@@ -84,26 +83,19 @@ tab1,tab2=st.tabs(["XOR Demo","MNIST Demo"])
 
 
 with tab1:
-    st.header("XOR Neural Network Playground")
-
-    # --- Model Setup ---
-    # --- Model Setup (XORModel with session persistence) ---
+    st.header("XOR - Neural Network Vizualization")
     if "xor_model" not in st.session_state:
-        st.session_state["xor_model"] = XORModel()          # model instance persisted across reruns
+        st.session_state["xor_model"] = XORModel()
         st.session_state["xor_trained"] = False
 
     model = st.session_state["xor_model"]
-
-    # Use BCELoss because XORModel ends with Sigmoid
     criterion = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
 
 
-    # --- XOR Data ---
     x = torch.tensor([[0., 0.], [0., 1.], [1., 0.], [1., 1.]], dtype=torch.float32)
     y = torch.tensor([[0.], [1.], [1.], [0.]], dtype=torch.float32)
 
-    # --- Sidebar: Training Settings ---
     st.sidebar.header("Training Settings")
     epochs = st.sidebar.slider("Epochs", 100, 2000, 500, step=100)
     train_btn = st.sidebar.button("Train XOR Model")
@@ -119,7 +111,6 @@ with tab1:
             losses.append(loss.item())
 
         st.success(f"✅ Training Complete! Final Loss: {loss.item():.4f}")
-            # persist weights so future reruns / viz use the trained model
         os.makedirs("models", exist_ok=True)
         save_path = "models/xor_streamlit.pth"
         torch.save(model.state_dict(), save_path)
@@ -127,14 +118,11 @@ with tab1:
         st.info(f"Model weights saved to {save_path}")
 
         
-
-    # --- Sidebar: Test Inputs ---
     st.sidebar.header("Test Inputs")
     a = st.sidebar.selectbox("Input A", [0.0, 1.0])
     b = st.sidebar.selectbox("Input B", [0.0, 1.0])
 
     if st.sidebar.button("Run XOR Prediction"):
-    # If saved weights exist, load them into the session model (ensures we use trained weights)
         save_path = "models/xor_streamlit.pth"
         if os.path.exists(save_path):
             model.load_state_dict(torch.load(save_path, map_location="cpu"))
@@ -145,8 +133,7 @@ with tab1:
 
         with torch.no_grad():
             test_input = torch.tensor([[float(a), float(b)]])
-            pred = model(test_input)  # XORModel already applies Sigmoid in forward
-            # ensure scalar prob
+            pred = model(test_input)
             prob = float(pred.item()) if pred.numel() == 1 else float(pred.detach().cpu().numpy().flatten()[0])
         st.write(f"**Prediction for ({a}, {b}):** {prob:.4f}  → class: {1 if prob > 0.5 else 0}")
 
@@ -155,7 +142,6 @@ with tab1:
 
     if st.button("Generate 3D XOR Visualization"):
         from viz.xor_3d import xor_3d_viz
-        # load trained weights if available
         save_path = "models/xor_streamlit.pth"
         if os.path.exists(save_path):
             model.load_state_dict(torch.load(save_path, map_location="cpu"))
@@ -165,7 +151,7 @@ with tab1:
             st.warning("No saved model found — visualizing current model (may be untrained).")
 
         input_tensor = torch.tensor([[float(a), float(b)]])
-        fig3d = xor_3d_viz(model, input_tensor)
+        fig3d = xor_3d_viz(model, input_tensor,animate=True)
         st.plotly_chart(fig3d, use_container_width=True)
 
 
@@ -173,8 +159,7 @@ with tab1:
 
 with tab2:
     st.header("MNIST Digit Classifier")
-     
-     #data setup
+
     transform=transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.1307,),(0.3081,))])
     train_dataset=datasets.MNIST(root='data',train=True,download=True,transform=transform)
     test_dataset=datasets.MNIST(root='data',train=False,download=True,transform=transform)
@@ -183,17 +168,14 @@ with tab2:
     test_loader=torch.utils.data.DataLoader(test_dataset,batch_size=10,shuffle=False)
 
 
-     #model setup
     mnist_model=MLP(28*28,[128,64],10)
     criterion=nn.CrossEntropyLoss()
     optimizer=optim.Adam(mnist_model.parameters(),lr=0.001,weight_decay=1e-4)
 
-     #sidebar
     st.sidebar.header("MNIST Training Settings")
     mnist_epochs=st.sidebar.slider("Epochs",1,15,5)
     mnist_btn=st.sidebar.button("Train MNIST Model")
      
-     #training
     if mnist_btn:
         mnist_model.train()
         losses=[]
@@ -215,7 +197,6 @@ with tab2:
         st.success(f"MNIST Training Complete! final loss: {loss.item():.4f}")
         
 
-        #plot training loss
         fig,ax=plt.subplots()
         ax.plot(losses)
         ax.set_xlabel("Epochs")
@@ -224,17 +205,12 @@ with tab2:
         
         st.pyplot(fig)
 
-    # --- MNIST Upload & Predict UI ---
     st.subheader("Upload & Predict a Digit")
 
-    # Load prediction model (cached so it doesn't reload on every rerun)
-    #@st.cache_resource(show_spinner=False)
     def get_predict_model(path="models/mnist.pt"):
         try:
-            # try to load saved weights
             return load_model(model_path=path, device="cpu")
         except Exception as e:
-            # If file missing or load fails, return None (we'll fallback)
             return None
 
     predict_model = get_predict_model("models/mnist.pt")
@@ -251,15 +227,11 @@ with tab2:
         if pil_img is not None:
             st.image(pil_img, caption="Uploaded image", width=150)
 
-            # Button to run prediction
             if st.button("Predict uploaded image"):
                 
 
-                # prefer saved model if available
                 if predict_model is None:
-                    # fallback to in-memory un/saved model defined above (mnist_model)
                     try:
-                        # ensure the model is on cpu and eval mode
                         mnist_model.eval()
                         local_model = mnist_model
                         st.info("Using in-session MNIST model (saved model not found).")
@@ -274,8 +246,6 @@ with tab2:
                     try:
                         img_bytes=uploaded.getvalue()
                         pred_label,probs=predict_image(local_model,image_bytes=img_bytes,device="cpu")
-                        st.write("predict_image top-3:", sorted(range(len(probs)), key=lambda i:probs[i], reverse=True)[:3])
-                        st.write("predict_image argmax:", int(np.argmax(probs)))
                         st.subheader(f"Predicted digit: {pred_label}")
 
                         #top 3 predictions
@@ -292,54 +262,12 @@ with tab2:
                         prepped = preproc_tensor.clone().view(1, 28, 28)  # normalized tensor
                         inv = prepped * 0.3081 + 0.1307
                         inv_img = (inv.squeeze().cpu().numpy() * 255.0).clip(0,255).astype('uint8')
-                        st.image(inv_img, caption="Preprocessed image shown to model (reconstructed)", width=150)
-
-                        st.write("Preprocessed tensor stats:", {
-                            "shape": preproc_tensor.shape,
-                            "min": float(preproc_tensor.min()),
-                            "max": float(preproc_tensor.max()),
-                            "mean": float(preproc_tensor.mean()),
-                            "std": float(preproc_tensor.std())
-                        })
-
-                        # make prediction using the same local_model we selected earlier
-                        # ensure tensor is float and on cpu and flattened (MLP expects [1, 784])
+                        st.image(inv_img, caption="Preprocessed image shown to model", width=150)
                         input_tensor = preproc_tensor.to("cpu").float().view(1, -1)
 
-                        with torch.no_grad():
-                            try:
-                                st.write("DEBUG before model call")  # should print
-                                st.write("DEBUG local_model type:", type(local_model))
-                                output = local_model(input_tensor)
-                                st.write("DEBUG after model call")
-                            except Exception as e:
-                                st.error(f"Prediction failed: {e}")
-                            probs_from_forward = torch.softmax(output, dim=1).cpu().numpy()[0]
-                            pred_from_forward = int(np.argmax(probs_from_forward))
+                        
 
-                        # display predicted value (from direct forward)
-                        st.write(f"Predicted Digit (direct forward): {pred_from_forward}")
-
-                        # --- DEBUG: compare predict_image helper vs direct model forward ---
-                        debug_tensor = preproc_tensor.to("cpu").float()  # shape (1,784)
-
-                        with torch.no_grad():
-                            logits_direct = local_model(debug_tensor)           # raw logits
-                            probs_direct = torch.softmax(logits_direct, dim=1).cpu().numpy()[0]  # size 10
-                            argmax_direct = int(np.argmax(probs_direct))
-
-                        # If you already used predict_image() earlier:
-                        st.write("DEBUG compare:")
-                        st.write(" predict_image() returned: ", pred_label, probs[:5])
-                        st.write(" direct forward argmax:", argmax_direct, " top probs:", probs_direct[:5])
-                        st.write(" raw logits (direct):", logits_direct.detach().cpu().numpy().round(4))
-
-                        # debug numeric summary
-                        arr = preproc_tensor.detach().cpu().numpy().reshape(-1)
-                        st.write("preprocess shape:", arr.shape)
-                        st.write("min,max,mean,std:", float(arr.min()), float(arr.max()), float(arr.mean()), float(arr.std()))
-                        st.write("first10:", arr[:10].tolist())
-
+                        
                         # save for viz
                         st.session_state['test_image_tensor'] = preproc_tensor
                         st.session_state['test_label_pred'] = int(pred_label)
@@ -371,9 +299,10 @@ with tab2:
             pred = torch.argmax(output, dim=1).item()
         activations=rec.get_activations()
         
-        img = images[0].squeeze().numpy()
-        true_label = labels[0].item()
-        st.image(img, caption=f"True Label: {true_label}, Predicted: {pred}", width=150)
+        
+        img = images[0].squeeze().cpu().numpy()
+        img_denorm = img * 0.3081 + 0.1307
+        st.image(img_denorm, caption=f"Predicted: {pred}", width=150, clamp=True)
 
         for layer_name,act in activations.items():
             fig,ax=plt.subplots(figsize=(6,3))
@@ -381,7 +310,7 @@ with tab2:
             ax.set_title(f"Layer Activations: {layer_name}")
             st.pyplot(fig)
         
-        # Store images and labels in session state for 3D viz
+        
         st.session_state['test_images'] = images
         st.session_state['test_labels'] = labels
 
@@ -397,7 +326,7 @@ with tab2:
 
             st.info("Generating 3D Vizualisation")
             x=pil_img.view(1,-1).float()
-            fig3d = mnist_3d_viz(x, torch.tensor([st.session_state['test_label_pred']]), mnist_model)
+            fig3d = mnist_3d_viz(x, torch.tensor([st.session_state['test_label_pred']]), mnist_model,animate=True)
             st.plotly_chart(fig3d,use_container_width=True)
 
         #case2: fallback to sample input
@@ -407,8 +336,8 @@ with tab2:
             x=images[0].view(1,-1)
             label=labels[0].item()
 
-            st.info(f"Generating 3D Visualization for test sample (True Label: {label})...")
-            fig3d = mnist_3d_viz(x, torch.tensor([label]), mnist_model)
+            st.info(f"Generating 3D Visualization for test sample")
+            fig3d = mnist_3d_viz(x, torch.tensor([label]), mnist_model,animate=True)
             st.plotly_chart(fig3d, use_container_width=True)
         
         #case3: no input
