@@ -32,8 +32,7 @@ Singularity/
 ├── requirements.txt
 ├── setup.cfg
 │
-├── app/
-│   └── app.py
+├── app.py
 │
 ├── assets/
 │   ├── 3d_layout.png
