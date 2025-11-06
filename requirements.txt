@@ -8,3 +8,4 @@ numpy
 pandas
 pytest
 streamlit-drawable-canvas
+matplotlib
