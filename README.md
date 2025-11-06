@@ -62,6 +62,7 @@ Singularity/
     ├── mnist_3d.py
     ├── network_viz.py
     └── xor_3d.py
+```
 
 ## Live Demo
 
