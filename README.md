@@ -16,7 +16,7 @@ Key points:
 
 - **Interactive 3D Visualization** – Explore neurons, layers, and connections in an intuitive 3D environment.  
 - **Layer-wise Forward Pass Animation** – Watch activations propagate through the network step by step.  
-- **Supports Multiple Models** – XOR network (2–2–1 MLP) and MNIST digit classifier.  
+- **Supports Multiple Models** – XOR network and MNIST digit classifier.  
 - **Activation and Weight Insights** – Observe how activations and connection strengths change during inference.  
 - **Detailed Annotations** – Each layer and neuron includes informative labels and explanations.  
 - **Easy-to-use Interface** – Simple controls to play, pause, and explore network behavior.  
