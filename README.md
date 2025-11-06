@@ -64,8 +64,7 @@ Singularity/
     └── xor_3d.py
 
 ## Live Demo
+
 Try out the **Singularity** app live on Streamlit: [https://srishtikapoor22-singularity-app-qa2yle.streamlit.app/](https://srishtikapoor22-singularity-app-qa2yle.streamlit.app/)
-
-
 
 
