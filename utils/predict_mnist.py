@@ -1,4 +1,3 @@
-# utils/predict_mnist.py
 from PIL import Image, ImageOps
 import torch
 import torch.nn.functional as F
@@ -9,7 +8,7 @@ from torchvision import transforms
 import numpy as np
 from PIL import Image,ImageOps,ImageFilter 
 
-MODEL_PATH = "models/mnist.pt"   # adjust if different
+MODEL_PATH = "models/mnist.pt"
 
 def load_model(model_path: str = MODEL_PATH, device="cpu"):
     model = MLP(input_dim=28*28, hidden_dims=[128, 64], output_dim=10)
@@ -54,10 +53,6 @@ def _preprocess_pil(img: Image.Image):
 
 
 def predict_image(model, pil_image=None, image_bytes: bytes = None, device="cpu"):
-    """
-    Predicts from a PIL Image or raw image bytes.
-    Returns (pred_label:int, probs: list[float]) where probs are softmaxed probabilities for classes 0..9.
-    """
     if pil_image is None and image_bytes is not None:
         pil_image = Image.open(io.BytesIO(image_bytes))
 
@@ -71,6 +66,4 @@ def predict_image(model, pil_image=None, image_bytes: bytes = None, device="cpu"
         logits = model(x)
         probs = F.softmax(logits, dim=1).cpu().numpy()[0]
         pred = int(np.argmax(probs))
-
-    # return predicted label and probability vector
     return pred, probs.tolist()
