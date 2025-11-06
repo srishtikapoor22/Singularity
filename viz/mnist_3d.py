@@ -9,7 +9,6 @@ import torch.nn as nn
 
 
 def normalize(x):
-    """Normalize numpy array to 0–1 safely."""
     x = np.array(x, dtype=float)
     if x.size == 0:
         return x
@@ -20,10 +19,6 @@ def normalize(x):
 
 
 def layer_coords(layer_sizes, layer_gap=10, neuron_gap=1.5):
-    """
-    Generate clean, linear coordinates for neurons in each layer.
-    Layers aligned along the X-axis, neurons evenly spaced vertically.
-    """
     coords = []
     for i, size in enumerate(layer_sizes):
         x = i * layer_gap
@@ -35,7 +30,6 @@ def layer_coords(layer_sizes, layer_gap=10, neuron_gap=1.5):
 
 
 def subsample_activations(acts, max_neurons=150):
-    """Reduce neuron count for visualization clarity."""
     if acts.shape[1] > max_neurons:
         idx = np.linspace(0, acts.shape[1] - 1, max_neurons).astype(int)
         acts = acts[:, idx]
@@ -44,10 +38,6 @@ def subsample_activations(acts, max_neurons=150):
 
 
 def mnist_3d_viz(images=None, labels=None, model=None, sample_idx=0, max_neurons_per_layer=40,animate=False):
-    """
-    Clean, explainable MNIST forward-pass visualization:
-    Input -> Hidden1 -> Hidden2 -> Output (linear layout, adaptive spacing, glowing activations)
-    """
     import torch
     import torch.nn.functional as F
     import numpy as np

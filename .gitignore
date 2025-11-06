@@ -70,3 +70,6 @@ data/processed/
 
 # Streamlit
 .streamlit/
+
+tests/
+assets/

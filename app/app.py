@@ -7,13 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from models.mlp import MLP
 from models.xor_model import XORModel
-from viz.animate_fwd import animate_fwd
 from utils.activations import ActivationRecorder
 import sys, os
 import torchvision
-from viz.interactive_net import build_network_fig, forward_pass_act
 from data.mnist import get_mnist_loaders
-from viz.mnist_viz import viz_mnistfwd
 from torch.utils.data import DataLoader
 from torchvision import datasets,transforms
 from utils.predict_mnist import load_model, predict_image,_preprocess_pil
@@ -110,7 +107,7 @@ with tab1:
             optimizer.step()
             losses.append(loss.item())
 
-        st.success(f"✅ Training Complete! Final Loss: {loss.item():.4f}")
+        st.success(f"Training Complete! Final Loss: {loss.item():.4f}")
         os.makedirs("models", exist_ok=True)
         save_path = "models/xor_streamlit.pth"
         torch.save(model.state_dict(), save_path)
@@ -258,16 +255,6 @@ with tab2:
                         pil_img=Image.open(io.BytesIO(img_bytes)).convert("L")
                         preproc_tensor=_preprocess_pil(pil_img)
 
-                        #DEBUG
-                        prepped = preproc_tensor.clone().view(1, 28, 28)  # normalized tensor
-                        inv = prepped * 0.3081 + 0.1307
-                        inv_img = (inv.squeeze().cpu().numpy() * 255.0).clip(0,255).astype('uint8')
-                        st.image(inv_img, caption="Preprocessed image shown to model", width=150)
-                        input_tensor = preproc_tensor.to("cpu").float().view(1, -1)
-
-                        
-
-                        
                         # save for viz
                         st.session_state['test_image_tensor'] = preproc_tensor
                         st.session_state['test_label_pred'] = int(pred_label)
@@ -277,7 +264,7 @@ with tab2:
                     except Exception as e:
                         st.error(f"Prediction failed: {e}")
 
-        #testing and viz
+    #testing and viz
     st.subheader("MNIST Model Testing and Visualization")
 
     if st.button("Test MNIST Model"):
@@ -310,7 +297,7 @@ with tab2:
             ax.set_title(f"Layer Activations: {layer_name}")
             st.pyplot(fig)
         
-        
+        # Store images and labels in session state for 3D viz
         st.session_state['test_images'] = images
         st.session_state['test_labels'] = labels
 
@@ -336,7 +323,7 @@ with tab2:
             x=images[0].view(1,-1)
             label=labels[0].item()
 
-            st.info(f"Generating 3D Visualization for test sample")
+            st.info(f"Generating 3D Visualization for test sample (True Label: {label})...")
             fig3d = mnist_3d_viz(x, torch.tensor([label]), mnist_model,animate=True)
             st.plotly_chart(fig3d, use_container_width=True)
         
